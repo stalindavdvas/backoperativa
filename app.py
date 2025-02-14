@@ -4,6 +4,7 @@ import numpy as np
 from scipy.optimize import linprog
 from pulp import LpMaximize, LpProblem, LpVariable
 import pulp
+import pandas as pd
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"], supports_credentials=True)
 
@@ -117,6 +118,9 @@ def metodo_gran_m():
     # Definir la función objetivo
     problema += pulp.lpSum(funcion_objetivo[i] * variables[i] for i in range(num_variables)), "Z"
 
+    # Guardar tablas de iteraciones
+    iteraciones = []
+
     # Agregar restricciones con distintos signos
     for restriccion in restricciones:
         coeficientes = restriccion['coeficientes']
@@ -130,14 +134,19 @@ def metodo_gran_m():
         elif signo == "=":
             problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) == valor
 
-    # Resolver el problema
-    problema.solve()
+    # Resolver el problema con seguimiento de iteraciones
+    problema.solve(pulp.PULP_CBC_CMD(msg=1))
 
-    # Extraer resultados
+    # Extraer iteraciones desde el solver
+    for constraint in problema.constraints.values():
+        iteraciones.append([constraint.name, constraint.pi, constraint.slack])
+
+    # Extraer resultados finales
     resultado = {
         "solucion": {v.name: v.varValue for v in variables},
         "valor_optimo": pulp.value(problema.objective),
-        "estado": pulp.LpStatus[problema.status]
+        "estado": pulp.LpStatus[problema.status],
+        "iteraciones": iteraciones
     }
 
     return jsonify(resultado)
