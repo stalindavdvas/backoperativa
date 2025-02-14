@@ -100,20 +100,47 @@ def resolver_gran_m(func_obj, restricciones, valores):
 
 
 @app.route('/gran_m', methods=['POST'])
-def gran_m():
-    try:
-        datos = request.json
-        print("Datos recibidos:", datos)  # Debug
-        resultado = resolver_gran_m(
-            datos['funcion_objetivo'],
-            datos['restricciones_coeficientes'],
-            datos['restricciones_valores']
-        )
-        print("Resultado:", resultado)  # Debug
-        return jsonify(resultado)
-    except Exception as e:
-        print("Error en el backend:", str(e))
-        return jsonify({"error": str(e)}), 500
+def metodo_gran_m():
+    datos = request.json
+
+    funcion_objetivo = datos['funcion_objetivo']
+    restricciones = datos['restricciones']
+
+    num_variables = len(funcion_objetivo)
+
+    # Crear el problema de optimización
+    problema = pulp.LpProblem("Metodo_Gran_M", pulp.LpMaximize)
+
+    # Definir las variables
+    variables = [pulp.LpVariable(f'X{i+1}', lowBound=0) for i in range(num_variables)]
+
+    # Definir la función objetivo
+    problema += pulp.lpSum(funcion_objetivo[i] * variables[i] for i in range(num_variables)), "Z"
+
+    # Agregar restricciones con distintos signos
+    for restriccion in restricciones:
+        coeficientes = restriccion['coeficientes']
+        signo = restriccion['signo']
+        valor = restriccion['valor']
+
+        if signo == "<=":
+            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) <= valor
+        elif signo == ">=":
+            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) >= valor
+        elif signo == "=":
+            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) == valor
+
+    # Resolver el problema
+    problema.solve()
+
+    # Extraer resultados
+    resultado = {
+        "solucion": {v.name: v.varValue for v in variables},
+        "valor_optimo": pulp.value(problema.objective),
+        "estado": pulp.LpStatus[problema.status]
+    }
+
+    return jsonify(resultado)
 
 ####################### MEtodo 2 Fases########################################
 @app.route('/dos_fases', methods=['POST'])
