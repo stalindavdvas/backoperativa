@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solver Web</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Método de la Esquina Noroeste</h1>
+
+    <label for="oferta">Oferta (ejemplo: 30,40):</label>
+    <input type="text" id="oferta">
+
+    <label for="demanda">Demanda (ejemplo: 20,50):</label>
+    <input type="text" id="demanda">
+
+    <label for="costos">Matriz de Costos (ejemplo: [[8,6],[4,3]]):</label>
+    <input type="text" id="costos">
+
+    <button onclick="resolver()">Resolver</button>
+
+    <h2>Resultado</h2>
+    <pre id="resultado"></pre>
+
+    <script src="script.js"></script>
+</body>
+</html>
