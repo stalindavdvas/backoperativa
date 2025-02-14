@@ -72,20 +72,28 @@ def resolver_simplex():
     except Exception as e:
         return jsonify({"error": "Error en el servidor", "mensaje": str(e)}), 500
 
-
+###################### Metodo Gran M #####################################################
 def resolver_gran_m(func_obj, restricciones, valores):
     prob = pulp.LpProblem("GranM", pulp.LpMaximize)
-    variables = [pulp.LpVariable(f"x{i}", lowBound=0) for i in range(len(func_obj))]
 
-    prob += pulp.lpSum(func_obj[i] * variables[i] for i in range(len(func_obj)))
+    # Crear variables con nombres x1, x2, x3, ...
+    variables = {f"x{i + 1}": pulp.LpVariable(f"x{i + 1}", lowBound=0) for i in range(len(func_obj))}
 
+    # Definir la función objetivo
+    prob += pulp.lpSum(func_obj[i] * variables[f"x{i + 1}"] for i in range(len(func_obj)))
+
+    # Agregar restricciones
     for i in range(len(restricciones)):
-        prob += pulp.lpSum(restricciones[i][j] * variables[j] for j in range(len(func_obj))) <= valores[i]
+        prob += pulp.lpSum(restricciones[i][j] * variables[f"x{j + 1}"] for j in range(len(func_obj))) <= valores[i]
 
+    # Resolver el problema
     prob.solve()
 
+    # Construir la respuesta con nombres de variables
+    solucion = {v.name: v.varValue for v in variables.values()}
+
     return {
-        "solucion": [v.varValue for v in variables],
+        "solucion": solucion,  # Diccionario con x1 = valor, x2 = valor, ...
         "valor_optimo": pulp.value(prob.objective),
         "status": pulp.LpStatus[prob.status]
     }
@@ -93,14 +101,21 @@ def resolver_gran_m(func_obj, restricciones, valores):
 
 @app.route('/gran_m', methods=['POST'])
 def gran_m():
-    datos = request.json
-    return jsonify(resolver_gran_m(
-        datos['funcion_objetivo'],
-        datos['restricciones_coeficientes'],
-        datos['restricciones_valores']
-    ))
+    try:
+        datos = request.json
+        print("Datos recibidos:", datos)  # Debug
+        resultado = resolver_gran_m(
+            datos['funcion_objetivo'],
+            datos['restricciones_coeficientes'],
+            datos['restricciones_valores']
+        )
+        print("Resultado:", resultado)  # Debug
+        return jsonify(resultado)
+    except Exception as e:
+        print("Error en el backend:", str(e))
+        return jsonify({"error": str(e)}), 500
 
-
+####################### MEtodo 2 Fases########################################
 @app.route('/dos_fases', methods=['POST'])
 def dos_fases():
     datos = request.json
@@ -110,7 +125,7 @@ def dos_fases():
         datos['restricciones_valores']
     ))
 
-
+##################### Metodo Dual #####################################
 @app.route('/dual', methods=['POST'])
 def dual():
     datos = request.json
