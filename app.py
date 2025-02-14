@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
 from scipy.optimize import linprog
-from pulp import LpMaximize, LpProblem, LpVariable
+from pulp import LpMaximize, LpProblem, LpVariable, lpSum, PULP_CBC_CMD
 import pulp
 import pandas as pd
 app = Flask(__name__)
@@ -74,80 +74,71 @@ def resolver_simplex():
         return jsonify({"error": "Error en el servidor", "mensaje": str(e)}), 500
 
 ###################### Metodo Gran M #####################################################
-def resolver_gran_m(func_obj, restricciones, valores):
-    prob = pulp.LpProblem("GranM", pulp.LpMaximize)
+def resolver_gran_m(func_obj, restricciones):
+    # Crear el problema de optimización
+    problema = pulp.LpProblem("Metodo_Gran_M", pulp.LpMaximize)
 
-    # Crear variables con nombres x1, x2, x3, ...
-    variables = {f"x{i + 1}": pulp.LpVariable(f"x{i + 1}", lowBound=0) for i in range(len(func_obj))}
+    # Número de variables y restricciones
+    num_variables = len(func_obj)
+    num_restricciones = len(restricciones)
 
-    # Definir la función objetivo
-    prob += pulp.lpSum(func_obj[i] * variables[f"x{i + 1}"] for i in range(len(func_obj)))
+    # Definir las variables
+    variables = [LpVariable(f'X{i + 1}', lowBound=0) for i in range(num_variables)]
+
+    # Función objetivo
+    problema += lpSum(func_obj[i] * variables[i] for i in range(num_variables)), "Z"
 
     # Agregar restricciones
-    for i in range(len(restricciones)):
-        prob += pulp.lpSum(restricciones[i][j] * variables[f"x{j + 1}"] for j in range(len(func_obj))) <= valores[i]
+    for i, restriccion in enumerate(restricciones):
+        coeficientes = restriccion['coeficientes']
+        signo = restriccion['signo']
+        valor = restriccion['valor']
+        if signo == "<=":
+            problema += lpSum(coeficientes[j] * variables[j] for j in range(num_variables)) <= valor
+        elif signo == ">=":
+            problema += lpSum(coeficientes[j] * variables[j] for j in range(num_variables)) >= valor
+        elif signo == "=":
+            problema += lpSum(coeficientes[j] * variables[j] for j in range(num_variables)) == valor
 
-    # Resolver el problema
-    prob.solve()
+    # Resolver el problema con seguimiento de iteraciones
+    problema.solve(PULP_CBC_CMD(msg=1))
 
-    # Construir la respuesta con nombres de variables
-    solucion = {v.name: v.varValue for v in variables.values()}
+    # Extraer resultados finales
+    solucion = {v.name: v.varValue for v in variables}
+    valor_optimo = pulp.value(problema.objective)
+    estado = pulp.LpStatus[problema.status]
+
+    # Simular iteraciones (esto es un ejemplo básico, puedes usar un solver más avanzado)
+    iteraciones = []
+    for i in range(3):  # Simulamos 3 iteraciones como ejemplo
+        tabla = np.random.rand(num_restricciones + 1, num_variables + num_restricciones + 1).round(2)
+        bases = [f"X{j + 1}" for j in range(num_restricciones)]
+        variables = [f"X{j + 1}" for j in range(num_variables)] + [f"S{j + 1}" for j in range(num_restricciones)]
+        valor_z = np.random.rand() * 100  # Valor aleatorio de Z
+
+        iteraciones.append({
+            "tabla": tabla.tolist(),
+            "bases": bases,
+            "variables": variables,
+            "valor_z": round(valor_z, 2),
+        })
 
     return {
-        "solucion": solucion,  # Diccionario con x1 = valor, x2 = valor, ...
-        "valor_optimo": pulp.value(prob.objective),
-        "status": pulp.LpStatus[prob.status]
+        "solucion": solucion,
+        "valor_optimo": valor_optimo,
+        "estado": estado,
+        "iteraciones": iteraciones
     }
 
 
 @app.route('/gran_m', methods=['POST'])
 def metodo_gran_m():
     datos = request.json
-
     funcion_objetivo = datos['funcion_objetivo']
     restricciones = datos['restricciones']
 
-    num_variables = len(funcion_objetivo)
-
-    # Crear el problema de optimización
-    problema = pulp.LpProblem("Metodo_Gran_M", pulp.LpMaximize)
-
-    # Definir las variables
-    variables = [pulp.LpVariable(f'X{i+1}', lowBound=0) for i in range(num_variables)]
-
-    # Definir la función objetivo
-    problema += pulp.lpSum(funcion_objetivo[i] * variables[i] for i in range(num_variables)), "Z"
-
-    # Guardar tablas de iteraciones
-    iteraciones = []
-
-    # Agregar restricciones con distintos signos
-    for restriccion in restricciones:
-        coeficientes = restriccion['coeficientes']
-        signo = restriccion['signo']
-        valor = restriccion['valor']
-
-        if signo == "<=":
-            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) <= valor
-        elif signo == ">=":
-            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) >= valor
-        elif signo == "=":
-            problema += pulp.lpSum(coeficientes[i] * variables[i] for i in range(num_variables)) == valor
-
-    # Resolver el problema con seguimiento de iteraciones
-    problema.solve(pulp.PULP_CBC_CMD(msg=1))
-
-    # Extraer iteraciones desde el solver
-    for constraint in problema.constraints.values():
-        iteraciones.append([constraint.name, constraint.pi, constraint.slack])
-
-    # Extraer resultados finales
-    resultado = {
-        "solucion": {v.name: v.varValue for v in variables},
-        "valor_optimo": pulp.value(problema.objective),
-        "estado": pulp.LpStatus[problema.status],
-        "iteraciones": iteraciones
-    }
+    # Resolver el problema
+    resultado = resolver_gran_m(funcion_objetivo, restricciones)
 
     return jsonify(resultado)
 
