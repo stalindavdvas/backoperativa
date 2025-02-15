@@ -7,6 +7,8 @@ from methods.dual import dual
 from methods.esquina_noroeste import esquina_noroeste
 from methods.costo_minimo import costo_minimo
 from methods.vogel import vogel
+from methods.dijkstra import dijkstra
+from utils.graph_utils import validate_graph_data
 app = Flask(__name__)
 CORS(app)  # Habilita CORS para todas las rutas
 
@@ -175,6 +177,33 @@ def resolver_vogel():
     except Exception as e:
         print("Error en el backend:", str(e))  # Imprimir el error detallado
         return jsonify({"error": str(e)}), 500
+
+
+################### REDES: CAMINO MAS CORTO CON DIJKSTRA##############################
+@app.route("/camino-mas-corto", methods=["POST"])
+def calcular_camino_mas_corto():
+    try:
+        data = request.json
+
+        # Extraer datos
+        nodos = data.get("nodos")
+        aristas = data.get("aristas")
+        inicio = data.get("inicio")
+        fin = data.get("fin")
+
+        # Validar datos
+        validate_graph_data(nodos, aristas, inicio, fin)
+
+        # Calcular el camino más corto
+        resultado = dijkstra(nodos, aristas, inicio, fin)
+        return jsonify(resultado)
+    except ValueError as ve:
+        # Capturar errores de validación
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        # Capturar otros errores
+        print("Error interno:", str(e))  # Imprimir el error en los logs del servidor
+        return jsonify({"error": "Ocurrió un error interno en el servidor."}), 500
 ################ EJECUCION DE PROGRAMA ######################################
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
