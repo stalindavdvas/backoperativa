@@ -16,7 +16,7 @@ def gran_m(tipo_optimizacion, c, A, signos, b):
     total_vars = num_vars + num_holgura + num_exceso + num_artificiales
 
     # Crear la tabla inicial
-    tableau = np.zeros((num_restricciones + 1, total_vars + 1))
+    tableau = np.zeros((num_restricciones + 1, total_vars + 1), dtype=object)  # Usamos dtype=object para manejar 'M'
     tableau[:num_restricciones, :num_vars] = A
     tableau[:num_restricciones, -1] = b
 
@@ -44,8 +44,8 @@ def gran_m(tipo_optimizacion, c, A, signos, b):
             artificial_index += 1
 
     # Función objetivo con penalización M
-    M = 1e6  # Valor grande para M
-    objective = np.zeros(total_vars)
+    M = "M"  # Representamos M como un símbolo
+    objective = np.zeros(total_vars, dtype=object)
     objective[:num_vars] = -np.array(c) if tipo_optimizacion == "max" else np.array(c)
     for i, var in enumerate(variable_names):
         if var.startswith("A"):
@@ -62,16 +62,16 @@ def gran_m(tipo_optimizacion, c, A, signos, b):
         tabla_con_nombres = {
             "base": base_variables.copy(),
             "columnas": variable_names + ["RHS"],
-            "valores": tableau.tolist(),
+            "valores": [[val if val != "M" else "M" for val in fila] for fila in tableau.tolist()],
         }
         iteraciones.append(tabla_con_nombres)
 
         # Condición de optimalidad
-        if all(val >= 0 for val in tableau[-1, :-1]):
+        if all(val >= 0 if isinstance(val, (int, float)) else False for val in tableau[-1, :-1]):
             break
 
         # Elegir columna pivote (variable entrante)
-        pivot_col = np.argmin(tableau[-1, :-1])
+        pivot_col = np.argmin([float("inf") if val == "M" else val for val in tableau[-1, :-1]])
         variable_entrante = variable_names[pivot_col]
 
         # Elegir fila pivote (variable saliente)

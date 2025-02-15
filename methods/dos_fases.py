@@ -8,15 +8,23 @@ def dos_fases(tipo_optimizacion, c, A, signos, b):
     num_vars = len(c)
     num_restricciones = len(A)
 
+    # Contar variables adicionales (holgura, exceso, artificiales)
+    num_holgura = sum(1 for signo in signos if signo == "<=")
+    num_exceso = sum(1 for signo in signos if signo == ">=")
+    num_artificiales = sum(1 for signo in signos if signo in [">=", "="])
+
+    total_vars = num_vars + num_holgura + num_exceso + num_artificiales
+
     # Crear la tabla inicial
-    tableau = np.zeros((num_restricciones + 1, num_vars + num_restricciones * 2 + 1))
+    tableau = np.zeros((num_restricciones + 1, total_vars + 1))
     tableau[:num_restricciones, :num_vars] = A
     tableau[:num_restricciones, -1] = b
 
     # Agregar variables de holgura, exceso y artificiales
     variable_names = [f"X{i + 1}" for i in range(num_vars)]
     holgura_index = num_vars
-    artificial_index = num_vars + num_restricciones
+    exceso_index = num_vars + num_holgura
+    artificial_index = num_vars + num_holgura + num_exceso
 
     for i, signo in enumerate(signos):
         if signo == "<=":
@@ -24,11 +32,11 @@ def dos_fases(tipo_optimizacion, c, A, signos, b):
             variable_names.append(f"S{i + 1}")
             holgura_index += 1
         elif signo == ">=":
-            tableau[i, holgura_index] = -1
+            tableau[i, exceso_index] = -1
             tableau[i, artificial_index] = 1
             variable_names.append(f"E{i + 1}")
             variable_names.append(f"A{i + 1}")
-            holgura_index += 1
+            exceso_index += 1
             artificial_index += 1
         elif signo == "=":
             tableau[i, artificial_index] = 1
@@ -36,7 +44,7 @@ def dos_fases(tipo_optimizacion, c, A, signos, b):
             artificial_index += 1
 
     # Fase 1: Minimizar la suma de variables artificiales
-    objective_fase1 = np.zeros(len(variable_names))
+    objective_fase1 = np.zeros(total_vars)
     for i, var in enumerate(variable_names):
         if var.startswith("A"):
             objective_fase1[i] = 1
@@ -85,11 +93,18 @@ def dos_fases(tipo_optimizacion, c, A, signos, b):
         return {"error": "No hay solución factible."}
 
     # Eliminar variables artificiales
-    tableau = np.delete(tableau, [i for i, var in enumerate(variable_names) if var.startswith("A")], axis=1)
+    indices_artificiales = [i for i, var in enumerate(variable_names) if var.startswith("A")]
+    tableau = np.delete(tableau, indices_artificiales, axis=1)
     variable_names = [var for var in variable_names if not var.startswith("A")]
 
+    # Actualizar variables básicas
+    base_variables = [var for var in base_variables if not var.startswith("A")]
+
     # Fase 2: Resolver el problema original
-    tableau[-1, :-1] = -np.array(c) if tipo_optimizacion == "max" else np.array(c)
+    objective_fase2 = np.zeros(len(variable_names))
+    objective_fase2[:num_vars] = -np.array(c) if tipo_optimizacion == "max" else np.array(c)
+    tableau[-1, :-1] = objective_fase2
+
     iteraciones_fase2 = []
 
     while True:
