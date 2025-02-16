@@ -26,23 +26,23 @@ def gran_m(tipo_optimizacion, c, A, signos, b):
             variable_names.append(f"S{i + 1}")
             holgura_index += 1
         elif signo == ">=":
-            tableau[i, exceso_index] = -1
-            tableau[i, artificial_index] = 1
-            variable_names.append(f"E{i + 1}")
-            variable_names.append(f"A{i + 1}")
+            tableau[i, exceso_index] = -1  # Variable de exceso
+            tableau[i, artificial_index] = 1  # Variable artificial
+            variable_names.append(f"E{i + 1}")  # Variable de exceso
+            variable_names.append(f"A{i + 1}")  # Variable artificial
             exceso_index += 1
             artificial_index += 1
         elif signo == "=":
-            tableau[i, artificial_index] = 1
-            variable_names.append(f"A{i + 1}")
+            tableau[i, artificial_index] = 1  # Variable artificial
+            variable_names.append(f"A{i + 1}")  # Variable artificial
             artificial_index += 1
     # Función objetivo con penalización M
     M = 1e6  # Usamos un valor numérico grande para M
     objective = np.zeros(total_vars, dtype=float)
-    objective[:num_vars] = -np.array(c) if tipo_optimizacion == "max" else np.array(c)
+    objective[:num_vars] = c if tipo_optimizacion == "min" else -np.array(c)
     for i, var in enumerate(variable_names):
-        if var.startswith("A"):
-            objective[i] = -M if tipo_optimizacion == "max" else M
+        if var.startswith("A"):  # Penalizar variables artificiales
+            objective[i] = M if tipo_optimizacion == "min" else -M
     tableau[-1, :-1] = objective
     base_variables = [var for var in variable_names if var.startswith("S") or var.startswith("A")]
     base_variables.append("Z")
