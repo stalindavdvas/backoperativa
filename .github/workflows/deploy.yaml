@@ -36,7 +36,7 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/backoperativa:latest
-          docker stop backoperativa || true
-          docker rm backoperativa || true
-          docker run -d --name backoperativa -p 5000:5000 ${{ secrets.DOCKER_HUB_USERNAME }}/backoperativa:latest
+          sudo docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/backoperativa:latest
+          sudo docker stop backoperativa || true
+          sudo docker rm backoperativa || true
+          sudo docker run -d --name backoperativa -p 5000:5000 ${{ secrets.DOCKER_HUB_USERNAME }}/backoperativa:latest
